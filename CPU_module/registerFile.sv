@@ -1,0 +1,24 @@
+module registerFile(regData1, regData2, clk, reset, readAddr1, readAddr2, writeAddr, in, wr, GPIO_1, SW);
+	output [31:0] regData1, regData2;
+	input [31:0] in;
+	input [4:0] readAddr1, readAddr2, writeAddr;
+	input clk, reset, wr;
+
+	//////////////////////////////////////////////////////////
+	output [31:0] GPIO_1;
+	input [4:0] SW;
+	
+	assign GPIO_1 = dataOut[SW];
+	//////////////////////////////////////////////////////////
+	
+	
+	wire [31:0] writeDataMax[31:0];
+	wire [31:0] dataOut[31:0];
+	wire [31:0] readWriteCtrl;
+	
+	demux1_32 wdm (writeDataMax, writeAddr, in);
+	rwDemux rwdm (readWriteCtrl, writeAddr, wr);
+	registerBlock block (dataOut, clk, reset, writeDataMax, readWriteCtrl);
+	mux32_5 rmm0 (regData1, readAddr1, dataOut);
+	mux32_5 rmm1 (regData2, readAddr2, dataOut);
+endmodule

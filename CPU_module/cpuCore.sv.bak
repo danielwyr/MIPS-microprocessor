@@ -1,0 +1,282 @@
+module cpuCore(clk, reset, GPIO_0, GPIO_1, SW);
+	output [31:0] GPIO_0, GPIO_1;
+	input [9:0] SW;
+	input clk, reset;
+	
+	
+	//////////////////////////////////////////////////////////////////////////
+	wire [31:0] regFileProbe, SRAMProbe;
+	
+	assign GPIO_0 = p_counter;
+	assign GPIO_1 = SW[9] ? regFileProbe : SRAMProbe;
+	//////////////////////////////////////////////////////////////////////////
+	
+	
+	//////////////////////////////////////////////////////////////////////////
+	// Clock divider
+	reg [31:0] divided_clocks;
+	initial
+	divided_clocks = 0;
+
+	always @(posedge clk)
+	divided_clocks = divided_clocks + 1;
+	
+	parameter SELECTED_CLOCK = 2;
+	
+	wire slow_clk, fast_clk;
+	
+	assign slow_clk = divided_clocks[SELECTED_CLOCK + 1];
+	assign fast_clk = divided_clocks[SELECTED_CLOCK];
+	//////////////////////////////////////////////////////////////////////////
+
+	
+	//////////////////////////////////////////////////////////////////////////
+	// program counter circuit
+	// output p_counter --> instruction_mem
+	// input <-- Jump, signExtendedInst, branchSel, instruction
+	reg [31:0] p_counter, n_counter;
+	wire [31:0]icm_pc;
+	wire [31:0] jumpAddr;
+	wire [31:0] sft_instruction, sft_signExtendedInst;
+	wire [31:0] branchTrue, branchFalse;
+	wire [31:0] jumpTrue, jumpFalse;
+	wire [31:0] jumpRegTrue, jumpRegFalse;
+	
+	pc program_counter (p_counter, slow_clk, reset, n_counter);
+	
+	assign icm_pc = p_counter + 32'b100; // pc + 4
+	
+	assign sft_instruction = instruction << 2;
+	assign jumpAddr[27:0] = sft_instruction[27:0];
+	assign jumpAddr[31:28] = icm_pc[31:28];
+	
+	assign sft_signExtendedInst = signExtendedInst << 2;
+	assign branchTrue = sft_signExtendedInst + sft_instruction;
+	assign branchFalse = icm_pc;
+	mux2_1 branch_mux (jumpFalse, branchFalse, branchTrue, branchSel); // bgt datapath
+	
+	assign jumpTrue = jumpAddr;
+	mux2_1 jump_mux (jumpRegFalse, jumpFalse, jumpTrue, Jump); // jump datapath
+	
+	assign jumpRegTrue = readData1;
+	mux2_1 jumpReg_mux (n_counter, jumpRegFalse, jumpRegTrue, JumpReg); // jump register datapath
+	//////////////////////////////////////////////////////////////////////////
+	
+	
+	//////////////////////////////////////////////////////////////////////////
+	// instruction memory circuit
+	// output instruction
+	// input p_counter
+	wire [31:0] instruction;
+	instruction_mem im (instruction, reset, p_counter[9:3]);
+	//////////////////////////////////////////////////////////////////////////
+	
+	
+	//////////////////////////////////////////////////////////////////////////
+	// register file memory circuit
+	// output readData1, readData2
+	// input readReg1, readReg2, writeReg, writeDataToReg, RegWrite, RegDst
+	wire [4:0] readReg1, readReg2, writeReg;
+	wire [31:0] readData1, readData2, writeDataToReg;
+	wire [1:0] regFileClk;
+	
+	assign writeReg = RegDst ? instruction[15:11] : instruction[20:16];
+	assign readReg1 = instruction[25:21];
+	assign readReg2 = instruction[20:16];
+	
+	assign regFileClk[0] = fast_clk;
+	assign regFileClk[1] = slow_clk;
+
+	regFileMemory rfm (readData1, readData2, regFileClk, reset, readReg1, readReg2, writeReg, writeDataToReg, RegWrite, regFileProbe, SW[4:0]);
+	//////////////////////////////////////////////////////////////////////////
+	
+	
+	//////////////////////////////////////////////////////////////////////////
+	// signExtention circuit
+	// input instruction[15:0] //low 16 bits of instruction
+	// output signExtendedInst
+	wire [31:0] signExtendedInst;
+	signExtended se (signExtendedInst, instruction[15:0]);
+	//////////////////////////////////////////////////////////////////////////
+	
+	
+	//////////////////////////////////////////////////////////////////////////
+	// ALU circuit
+	// input readData1, readData2, signExtendedInst
+	wire [31:0] operand1, operand2;
+	assign operand1 = readData1;
+	mux2_1 ALUSrc_mux (operand2, readData2, signExtendedInst, ALUSrc);
+	//////////////////////////////////////////////////////////////////////////
+	
+	
+	//////////////////////////////////////////////////////////////////////////
+	// ALU circuit
+	// input operand1, operand2, ALUCtrl
+	// output zero, overflow, carryOut, negative, aluResult
+	wire zero, overflow, carryOut, negative;
+	wire [31:0] aluResult;
+	ALU alu (aluResult, zero, overflow, carryOut, negative, operand1, operand2, ALUCtrl);
+	//////////////////////////////////////////////////////////////////////////
+	
+	
+	//////////////////////////////////////////////////////////////////////////
+	// data memory circuit
+	// input address, writeDataToSRAM, MemWrite, MemRead
+	// output readDataSRAM
+	wire [10:0] address;
+	wire [31:0] writeDataToSRAM;
+	wire [31:0] readDataSRAM;
+	
+	assign writeDataToSRAM = readData2;
+	assign address = aluResult[10:0];
+	dataMemory dm (readDataSRAM, fast_clk, reset, MemWrite, MemRead, writeDataToSRAM, address, SRAMProbe, SW[4:0]);
+	
+	mux2_1 writeToReg_mux (writeDataToReg, aluResult, readDataSRAM, MemtoReg);
+	//////////////////////////////////////////////////////////////////////////
+	
+	
+	//////////////////////////////////////////////////////////////////////////
+	// Control circuit
+	// input instruction[31:26]
+	// output RegDst, Jump, Branch, MemRead, MemWrite, MemtoReg, ALUOp, ALUSrc, RegWrite
+	// output branchIfPositive
+	wire RegDst, Jump, Branch, MemRead, MemtoReg, MemWrite, ALUSrc, RegWrite;
+	wire branchIfPositive, branchSel;
+	wire [1:0] ALUOp;
+	control ctrl (Branch, ALUOp, MemRead, MemWrite, MemtoReg, RegDst, RegWrite, ALUSrc, Jump, instruction);
+	
+	nor ifPositive (branchIfPositive, zero, negative);
+	and branchCtrl (branchSel, Branch, branchIfPositive);
+	//////////////////////////////////////////////////////////////////////////
+	
+	
+	
+	//////////////////////////////////////////////////////////////////////////
+	// ALU Control circuit
+	// input instruction[5:0], ALUOp
+	// output ALUCtrl, JumpReg
+	wire JumpReg;
+	wire [2:0] ALUCtrl;
+	wire [5:0] functionField;
+	
+	assign functionField = instruction[5:0];
+	ALU_Control aluctrl (ALUCtrl, functionField, ALUOp, JumpReg);
+	//////////////////////////////////////////////////////////////////////////
+endmodule
+
+
+
+/*
+module cpuCore (clk, reset, SW, GPIO_0, GPIO_1);
+	output [31:0] GPIO_0, GPIO_1;
+	input [9:0] SW;
+	input clk, reset;
+	
+	//////////////////////////////////////////////////////////////////////////
+	wire [31:0] holder;
+	
+	assign GPIO_0 = im_readAddr;
+	
+	//////////////////////////////////////////////////////////////////////////
+	// Clock divider
+	reg [31:0] divided_clocks;
+	initial
+	divided_clocks = 0;
+
+	always @(posedge clk)
+	divided_clocks = divided_clocks + 1;
+	
+	parameter SELECTED_CLOCK = 2;
+	//////////////////////////////////////////////////////////////////////////
+	wire [31:0] im_readAddr, new_im_readAddr;
+	wire [31:0] jumpAddr, add_4_addr;
+	wire [31:0] jumpOut;
+	
+	wire [31:0] instruction, extendedInst,shiftedInst_32_0, shiftedInst_32_1;
+	
+	wire overflow_0, carryout_0;
+	wire overflow_1, carryout_1;
+	wire branchOut;
+	
+	wire Branch; 
+	wire BranchCtrl; // branch instruction control
+	wire Jump; // jump instruction control
+	wire JumpReg; // jump register instruction control
+	
+	wire RegDst; // RegDst control 
+	
+	wire [31:0] regData1, regData2;
+	reg [31:0] dataToReg;
+	reg [4:0] writeAddressToReg, readAddressToReg1, readAddressToReg2; 
+	reg regfile_wr;
+	
+	wire ALUSrc; // ALUSrc control
+	wire [1:0] ALUOp; // ALUOp control
+	
+	wire [31:0] instSrc, instDst, alu_out;
+	wire [2:0] aluCtrl; // alu operation instruction control (from ALU control module)
+	wire zero, overflow, carryOut, negative;
+	
+	wire [31:0] readData;
+	wire [10:0] SRAM_addr;
+	wire SRAM_eo;
+	wire MemWrite; // memory write control
+	wire MemRead; // memory read control
+	wire RegWrite;
+	wire branchTrue;
+	
+	wire MemtoReg; // store word instruction control
+	//////////////////////////////////////////////////////////////////////////
+	
+	
+	
+	control ctrl (instruction, Branch, ALUOp, MemRead, MemWrite, MemtoReg, RegDst, RegWrite, ALUSrc, Jump);
+	
+	ALU_Control alu_ctrl (aluCtrl, instruction[5:0], ALUOp, JumpReg);
+	
+	pc programer_counter (im_readAddr, divided_clocks[SELECTED_CLOCK + 1], reset, new_im_readAddr);
+	
+	// add programmer counter with 4
+	arithmatic add_4 (add_4_addr, carryout_0, overflow_0, im_readAddr, 32'b100, 1'b0, 1'b0);
+	
+	SLL sll2_0 (shiftedInst_32_0, instruction, 2'b10, 1'b0);
+	
+	assign jumpAddr[27:0] = shiftedInst_32_0[27:0];
+	assign jumpAddr[31:28] = add_4_addr[31:28];
+	
+	instruction_mem im (instruction, divided_clocks[SELECTED_CLOCK + 1], reset, im_readAddr[9:3]);
+	
+	mux2_1_5bit regFile_src (writeAddressToReg, instruction[20:16], instruction[15:11], RegDst);
+	
+	regFileMemory regfile (regData1, regData2, divided_clocks[SELECTED_CLOCK + 1 : SELECTED_CLOCK], reset, instruction[25:21], instruction[20:16], writeAddressToReg, dataToReg, ~RegWrite, GPIO_1, SW[9:5]);
+	
+	signExtended signExtender (extendedInst, instruction[15:0]);
+	
+	SLL sll2_1 (shiftedInst_32_1, extendedInst, 2'b10, 1'b0);
+	
+	arithmatic adder (branchTrue, carryout_1, overflow_1, shiftedInst_32_1, add_4_addr, 1'b0, 1'b0);
+	
+	and conditional_statement (BranchCtrl, Branch, negative);
+	
+	// branch instruction mux
+	mux2_1 branch_mux (branchOut, add_4_addr, branchTrue, BranchCtrl);
+	
+	// jump mux
+	mux2_1 jump_mux (jumpOut, branchOut, jumpAddr, Jump);
+	
+	mux2_1 jumpReg_mux (new_im_readAddr, jumpOut, regData1, JumpReg);
+	
+	mux2_1 alu_src (instDst, regData2, instSrc, ALUSrc);
+	
+	ALU main_alu (alu_out, zero, overflow, carryOut, negative, regData1, instDst, aluCtrl); 
+
+	dataMemory dm (readData, divided_clocks[SELECTED_CLOCK], reset, MemWrite, MemRead, regData2, alu_out, holder, SW[4:0]);
+	
+	mux2_1 SRAM_mux (dataToReg, alu_out, readData, MemtoReg);
+endmodule
+
+*/
+
+//	SRAM sram (SRAM_bus, alu_out[10:0] /*SRAM_addr*/, MemWrite, SRAM_eo); // need to add write driver
+//	
+//	assign SRAM_bus = (SRAM_eo & !MemWrite) ? regData2 : 16'bz;

@@ -1,0 +1,16 @@
+Warning (10273): Verilog HDL warning at memoryDataReg.v(6): extended using "x" or "z" File: C:/Users/yw28/Desktop/Lab5/Lab5/memoryDataReg.v Line: 6
+Warning (10273): Verilog HDL warning at memoryDataReg.v(7): extended using "x" or "z" File: C:/Users/yw28/Desktop/Lab5/Lab5/memoryDataReg.v Line: 7
+Warning (10273): Verilog HDL warning at dataMemory.sv(26): extended using "x" or "z" File: C:/Users/yw28/Desktop/Lab5/Lab5/dataMemory.sv Line: 26
+Info (10281): Verilog HDL Declaration information at ALU.sv(14): object "SLT" differs only in case from object "slt" in the same scope File: C:/Users/yw28/Desktop/Lab5/Lab5/ALU.sv Line: 14
+Info (10281): Verilog HDL Declaration information at ALU.sv(15): object "SLL" differs only in case from object "sll" in the same scope File: C:/Users/yw28/Desktop/Lab5/Lab5/ALU.sv Line: 15
+Warning (10273): Verilog HDL warning at SRAM.sv(25): extended using "x" or "z" File: C:/Users/yw28/Desktop/Lab5/Lab5/SRAM.sv Line: 25
+Warning (10034): Output port "HEX0" at DE1_SoC.v(2) has no driver File: C:/Users/yw28/Desktop/Lab5/Lab5/DE1_SoC.v Line: 2
+Warning (10034): Output port "HEX1" at DE1_SoC.v(2) has no driver File: C:/Users/yw28/Desktop/Lab5/Lab5/DE1_SoC.v Line: 2
+Warning (10034): Output port "HEX2" at DE1_SoC.v(2) has no driver File: C:/Users/yw28/Desktop/Lab5/Lab5/DE1_SoC.v Line: 2
+Warning (10034): Output port "HEX3" at DE1_SoC.v(2) has no driver File: C:/Users/yw28/Desktop/Lab5/Lab5/DE1_SoC.v Line: 2
+Warning (10034): Output port "HEX4" at DE1_SoC.v(2) has no driver File: C:/Users/yw28/Desktop/Lab5/Lab5/DE1_SoC.v Line: 2
+Warning (10034): Output port "HEX5" at DE1_SoC.v(2) has no driver File: C:/Users/yw28/Desktop/Lab5/Lab5/DE1_SoC.v Line: 2
+Warning (10034): Output port "LEDR" at DE1_SoC.v(3) has no driver File: C:/Users/yw28/Desktop/Lab5/Lab5/DE1_SoC.v Line: 3
+Warning (10030): Net "mem[127..46]" at instruction_mem.sv(6) has no driver or initial value, using a default initial value '0' File: C:/Users/yw28/Desktop/Lab5/Lab5/instruction_mem.sv Line: 6
+Warning (10034): Output port "out[31..1]" at SLT.sv(2) has no driver File: C:/Users/yw28/Desktop/Lab5/Lab5/SLT.sv Line: 2
+Warning (10034): Output port "readData1_wb" at MEM_WB.sv(18) has no driver File: C:/Users/yw28/Desktop/Lab5/Lab5/MEM_WB.sv Line: 18

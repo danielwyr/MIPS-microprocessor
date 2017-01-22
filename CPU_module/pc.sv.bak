@@ -1,0 +1,12 @@
+module pc(out, clk, reset, in);
+	output [31:0] out;
+	input [31:0] in;
+	input clk, reset;
+
+	
+	always@(posedge clk)
+	if(reset)
+	out <= in;
+	else 
+	out <= 32'b0;
+endmodule

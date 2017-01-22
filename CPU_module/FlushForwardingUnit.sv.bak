@@ -1,0 +1,65 @@
+module FlushForwardingUnit(ForwardA, 
+									 ForwardB, 
+									 RegWrite_mem,
+									 RegWrite_wb,
+									 MemRead_ex,
+									 MemWrite_ex,
+									 RegWrite_ex,
+									 Rs_ex, 
+									 Rt_ex, 
+									 writeRegOut_mem,
+									 writeRegOut_wb);
+	output [1:0] ForwardA, ForwardB;
+	input RegWrite_mem, RegWrite_wb;
+	input MemRead_ex, MemWrite_ex, RegWrite_ex;
+	input [4:0] Rs_ex, Rt_ex, writeRegOut_mem, writeRegOut_wb;
+	
+	
+	assign ForwardA = /*(RegWrite_mem &
+							 (writeRegOut_mem != 5'b0) &
+							 (writeRegOut_mem == Rs_ex)) ? 2'b10 :*/
+							 
+							 (RegWrite_wb &
+							 (writeRegOut_wb != 5'b0) &
+							 !(RegWrite_mem & (writeRegOut_mem != 5'b0)) &
+							 (writeRegOut_mem != writeRegOut_mem) &
+							 (writeRegOut_wb == Rs_ex)) ? 2'b01 : 
+							 
+							 (/*((MemWrite_ex & ~MemRead_ex) | RegWrite_ex) & */
+							  (RegWrite_mem & (writeRegOut_mem != 5'b0)) & 
+							  (RegWrite_wb & (writeRegOut_wb != 5'b0)) &
+							  /*(writeRegOut_wb == Rs_ex) & 
+							  (writeRegOut_mem == Rt_ex)*/
+							  (Rs_ex == writeRegOut_wb)) ? 2'b01 : 
+							  
+							 (/*((MemWrite_ex & ~MemRead_ex) | RegWrite_ex) & */
+							  (RegWrite_mem & (writeRegOut_mem != 5'b0)) & 
+							  (RegWrite_wb & (writeRegOut_wb != 5'b0)) &
+							  /*(writeRegOut_wb == Rt_ex) & 
+							  (writeRegOut_mem == Rs_ex)*/
+							  (Rs_ex == writeRegOut_mem)) ? 2'b10 : 2'b00;
+							 
+	assign ForwardB = /*(RegWrite_mem &
+							 (writeRegOut_mem != 5'b0) &
+							 (writeRegOut_mem == Rt_ex)) ? 2'b10 :*/
+							 
+							 (RegWrite_wb &
+							 (writeRegOut_wb != 5'b0) &
+							 !(RegWrite_mem & (writeRegOut_mem != 5'b0)) &
+							 (writeRegOut_mem != writeRegOut_mem) &
+							 (writeRegOut_wb == Rt_ex)) ? 2'b01 : 
+							 
+							 (/*((MemWrite_ex & ~MemRead_ex) | RegWrite_ex) & */
+							  (RegWrite_mem & (writeRegOut_mem != 5'b0)) & 
+							  (RegWrite_wb & (writeRegOut_wb != 5'b0)) &
+							  /*(writeRegOut_wb == Rs_ex) &
+							  (writeRegOut_mem == Rt_ex)*/
+							  (Rt_ex == writeRegOut_wb)) ? 2'b01 : 
+							  
+							 (/*((MemWrite_ex & ~MemRead_ex) | RegWrite_ex) & */
+							  (RegWrite_mem & (writeRegOut_mem != 5'b0)) & 
+							  (RegWrite_wb & (writeRegOut_wb != 5'b0)) &
+							  /*(writeRegOut_wb == Rt_ex) &
+							  (writeRegOut_mem == Rs_ex)*/
+							  (Rt_ex == writeRegOut_mem)) ? 2'b10 : 2'b00;
+endmodule
